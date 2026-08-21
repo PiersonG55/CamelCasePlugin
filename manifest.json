@@ -1,0 +1,9 @@
+{
+	"id": "camel-case-spellcheck",
+	"name": "Camel Case Spellcheck",
+	"version": "0.1.0",
+	"minAppVersion": "1.13.6",
+	"description": "Spellchecks the individual words in camelCase and PascalCase identifiers.",
+	"author": "Pierson Garcia",
+	"isDesktopOnly": true
+}

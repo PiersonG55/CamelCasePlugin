@@ -1,0 +1,22 @@
+# Editors
+.vscode/
+.idea/
+*.iml
+
+# Dependencies
+node_modules/
+
+# Generated plugin bundle and source maps
+main.js
+*.map
+
+# Test and tool output
+coverage/
+*.log
+
+# Per-vault plugin data
+data.json
+
+# Operating systems
+.DS_Store
+Thumbs.db

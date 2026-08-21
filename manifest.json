@@ -3,7 +3,7 @@
 	"name": "Camel Case Spellcheck",
 	"version": "0.1.0",
 	"minAppVersion": "1.13.6",
-	"description": "Spellchecks the individual words in camelCase and PascalCase identifiers.",
+	"description": "Spellchecks individual words in camelCase, PascalCase, and snake_case identifiers.",
 	"author": "Pierson Garcia",
 	"isDesktopOnly": true
 }

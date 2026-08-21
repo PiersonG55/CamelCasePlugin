@@ -1,24 +1,25 @@
 # Camel Case Spellcheck
 
 Camel Case Spellcheck is a desktop-only Obsidian plugin that checks the words
-inside `camelCase` and `PascalCase` identifiers independently.
+inside `camelCase`, `PascalCase`, and `snake_case` identifiers independently.
 
 Obsidian normally treats a complete identifier as one spelling token. This
-plugin splits compound identifiers at case boundaries and underlines only the
-component that appears to be misspelled.
+plugin splits compound identifiers at case and underscore boundaries and
+underlines only the component that appears to be misspelled.
 
 | Text | Result |
 | --- | --- |
 | `TheseAreAllWords` | No underline |
 | `TheLastWordIsMispleled` | Only `Mispleled` is underlined |
 | `theLastWordIsMispleled` | Only `Mispleled` is underlined |
+| `the_last_word_is_mispleled` | Only `mispleled` is underlined |
 | `parseHTTPResponse` | Checked as `parse`, `HTTP`, and `Response` |
 | `Mispleled` | Left to Obsidian's native spellchecker |
 
 ## Features
 
-- Checks components of camel case, Pascal case, acronyms, and identifiers with
-  numeric boundaries.
+- Checks components of camel case, Pascal case, snake case, acronyms, mixed
+  styles, and identifiers with numeric boundaries.
 - Uses a bundled US English Hunspell-compatible dictionary, so checking is
   local and works offline.
 - Waits briefly after an edit before displaying a new underline, matching the
@@ -63,9 +64,9 @@ Once Camel Case Spellcheck is available in the Obsidian Community directory:
 
 ## Usage
 
-Write camel-case or Pascal-case text normally. After a short pause, any
-misspelled component receives a red wavy underline. Right-click that component
-to replace it with a suggestion or add it to Obsidian's dictionary.
+Write camel-case, Pascal-case, or snake-case text normally. After a short pause,
+any misspelled component receives a red wavy underline. Right-click that
+component to replace it with a suggestion or add it to Obsidian's dictionary.
 
 Ordinary words are deliberately left alone, so Obsidian's native spellchecker
 continues to handle them.

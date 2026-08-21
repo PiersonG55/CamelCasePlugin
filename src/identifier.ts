@@ -11,7 +11,7 @@ export interface CompoundIdentifier {
 	parts: IdentifierPart[];
 }
 
-const IDENTIFIER_TOKEN_PATTERN = /[\p{L}\p{N}]+/gu;
+const IDENTIFIER_TOKEN_PATTERN = /[\p{L}\p{N}]+(?:_+[\p{L}\p{N}]+)*/gu;
 const IDENTIFIER_PART_PATTERN =
 	/[\p{Lu}\p{Lt}]+(?=[\p{Lu}\p{Lt}]\p{Ll})|[\p{Lu}\p{Lt}]?\p{Ll}+|[\p{Lu}\p{Lt}]+|\p{N}+/gu;
 const CASE_BOUNDARY_PATTERN =
@@ -27,7 +27,7 @@ export function scanCompoundIdentifiers(
 	for (const match of text.matchAll(IDENTIFIER_TOKEN_PATTERN)) {
 		const token = match[0];
 		const matchIndex = match.index;
-		if (!CASE_BOUNDARY_PATTERN.test(token)) {
+		if (!CASE_BOUNDARY_PATTERN.test(token) && !token.includes('_')) {
 			continue;
 		}
 

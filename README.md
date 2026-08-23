@@ -135,5 +135,6 @@ Camel Case Spellcheck is released under the [MIT License](./LICENSE).
 
 Spellchecking uses [`nspell`](https://github.com/wooorm/nspell) and the
 [`dictionary-en`](https://github.com/wooorm/dictionaries/tree/main/dictionaries/en)
-US English dictionary. Their license notices are preserved in the generated
-plugin bundle.
+US English dictionary. The `nspell` dependency uses
+[`is-buffer`](https://github.com/feross/is-buffer). Their license notices are
+preserved in the generated plugin bundle.

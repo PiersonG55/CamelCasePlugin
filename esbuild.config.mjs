@@ -10,6 +10,10 @@ const dictionaryDirectory = path.join(projectRoot, 'node_modules', 'dictionary-e
 const thirdPartyNotices = [
 	['nspell', path.join(projectRoot, 'node_modules', 'nspell', 'license')],
 	[
+		'is-buffer',
+		path.join(projectRoot, 'node_modules', 'is-buffer', 'LICENSE'),
+	],
+	[
 		'dictionary-en',
 		path.join(projectRoot, 'node_modules', 'dictionary-en', 'license'),
 	],

@@ -1,7 +1,7 @@
 {
 	"name": "camel-case-spellcheck",
 	"version": "0.1.0",
-	"description": "Spellchecks the individual words in camelCase and PascalCase identifiers in Obsidian.",
+	"description": "Spellchecks individual words in camelCase, PascalCase, and snake_case identifiers in Obsidian.",
 	"main": "main.js",
 	"type": "module",
 	"private": true,
@@ -22,6 +22,7 @@
 		"obsidian",
 		"camel-case",
 		"pascal-case",
+		"snake-case",
 		"spellcheck"
 	],
 	"devDependencies": {

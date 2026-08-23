@@ -1,0 +1,8 @@
+.camel-case-spellcheck-error {
+	text-decoration-line: underline;
+	text-decoration-style: wavy;
+	text-decoration-color: var(--text-error);
+	text-decoration-thickness: from-font;
+	text-underline-offset: 2px;
+	text-decoration-skip-ink: none;
+}

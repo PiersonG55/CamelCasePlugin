@@ -4,19 +4,31 @@ import {
 	CamelCaseSpellcheckController,
 	SpellcheckContextTarget,
 } from './editor-extension';
+import {
+	CamelCaseSpellcheckSettingTab,
+	CamelCaseSpellcheckSettings,
+	DEFAULT_SETTINGS,
+	normalizeSettings,
+} from './settings';
+import { normalizeWord } from './word-lists';
 
 const DICTIONARY_POLL_INTERVAL_MS = 5_000;
 const CORRECTION_MENU_SECTION = 'correction';
 const SPELLCHECK_MENU_SECTION = 'spellcheck';
 
 export default class CamelCaseSpellcheckPlugin extends Plugin {
+	settings: CamelCaseSpellcheckSettings = { ...DEFAULT_SETTINGS };
 	private controller: CamelCaseSpellcheckController | null = null;
 
-	onload(): void {
-		const spellchecker = DesktopSpellchecker.create();
-		this.controller = new CamelCaseSpellcheckController(spellchecker);
+	async onload(): Promise<void> {
+		this.settings = normalizeSettings(await this.loadData());
 
-		this.registerEditorExtension(this.controller.extension);
+		const spellchecker = DesktopSpellchecker.create();
+		const controller = new CamelCaseSpellcheckController(spellchecker);
+		this.controller = controller;
+		controller.applySettings(this.settings);
+
+		this.registerEditorExtension(controller.extension);
 		this.registerEvent(
 			this.app.workspace.on('editor-menu', (menu, editor) => {
 				this.addSpellingMenuItems(menu, editor);
@@ -31,18 +43,35 @@ export default class CamelCaseSpellcheckPlugin extends Plugin {
 			},
 		});
 
-		this.registerInterval(
-			window.setInterval(() => {
-				void this.controller?.pollDictionaryChanges();
-			}, DICTIONARY_POLL_INTERVAL_MS),
-		);
+		this.addSettingTab(new CamelCaseSpellcheckSettingTab(this.app, this));
 
-		void this.controller.pollDictionaryChanges();
+		// Parsing the bundled dictionary blocks the UI for tens of milliseconds,
+		// so wait until Obsidian has finished loading the workspace.
+		this.app.workspace.onLayoutReady(() => {
+			if (this.controller !== controller) {
+				return;
+			}
+
+			spellchecker.loadDictionary();
+			controller.refresh();
+
+			this.registerInterval(
+				window.setInterval(() => {
+					void controller.pollDictionaryChanges();
+				}, DICTIONARY_POLL_INTERVAL_MS),
+			);
+			void controller.pollDictionaryChanges();
+		});
 	}
 
 	onunload(): void {
 		this.controller?.dispose();
 		this.controller = null;
+	}
+
+	async saveSettings(): Promise<void> {
+		await this.saveData(this.settings);
+		this.controller?.applySettings(this.settings);
 	}
 
 	private addSpellingMenuItems(menu: Menu, editor: Editor): void {
@@ -61,14 +90,22 @@ export default class CamelCaseSpellcheckPlugin extends Plugin {
 			);
 		}
 
-		menu.addItem((item) => {
+		menu.addItem((item) =>
+			item
+				.setTitle(`Ignore “${target.text}” in identifiers`)
+				.setIcon('lucide-eye-off')
+				.setSection(SPELLCHECK_MENU_SECTION)
+				.onClick(() => void this.ignoreTarget(target)),
+		);
+
+		menu.addItem((item) =>
 			item
 				.setTitle(`Add “${target.text}” to dictionary`)
 				.setIcon('lucide-folder-tree')
 				.setSection(SPELLCHECK_MENU_SECTION)
 				.setDisabled(!this.controller?.spellchecker.canAddToDictionary)
-				.onClick(() => this.addTargetToDictionary(target));
-		});
+				.onClick(() => this.addTargetToDictionary(target)),
+		);
 	}
 
 	private replaceTarget(
@@ -86,6 +123,15 @@ export default class CamelCaseSpellcheckPlugin extends Plugin {
 			editor.offsetToPos(target.from),
 			editor.offsetToPos(target.to),
 		);
+	}
+
+	private async ignoreTarget(target: SpellcheckContextTarget): Promise<void> {
+		const word = normalizeWord(target.text);
+		if (!this.settings.ignoredWords.includes(word)) {
+			this.settings.ignoredWords = [...this.settings.ignoredWords, word].sort();
+			await this.saveSettings();
+		}
+		new Notice(`“${target.text}” will be ignored inside identifiers.`);
 	}
 
 	private addTargetToDictionary(target: SpellcheckContextTarget): void {

@@ -28,6 +28,11 @@ underlines only the component that appears to be misspelled.
   replacing only the misspelled component.
 - Reads words already learned by Obsidian and writes **Add to dictionary**
   choices back to the same persistent desktop dictionary.
+- Accepts common programming abbreviations such as `src`, `init`, `num`, and
+  `JSON` that are not English words. This can be turned off in settings.
+- Keeps a plugin-local ignore list for words that should pass inside
+  identifiers without being added to Obsidian's dictionary, via **Ignore in
+  identifiers** on the context menu or the settings tab.
 - Checks only visible editor content and skips code, comments, frontmatter,
   HTML, URLs, autolinks, and Markdown link syntax.
 
@@ -66,7 +71,14 @@ Once Camel Case Spellcheck is available in the Obsidian Community directory:
 
 Write camel-case, Pascal-case, or snake-case text normally. After a short pause,
 any misspelled component receives a red wavy underline. Right-click that
-component to replace it with a suggestion or add it to Obsidian's dictionary.
+component to replace it with a suggestion, ignore it inside identifiers, or add
+it to Obsidian's dictionary.
+
+**Ignore in identifiers** affects only this plugin and only compound
+identifiers; **Add to dictionary** changes Obsidian's native spellcheck
+everywhere. Both match case-insensitively, so ignoring `csae` also covers
+`Csae` and `CSAE`. The ignore list and the abbreviation toggle live in
+**Settings → Camel Case Spellcheck**.
 
 Ordinary words are deliberately left alone, so Obsidian's native spellchecker
 continues to handle them.

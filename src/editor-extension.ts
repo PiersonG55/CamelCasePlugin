@@ -14,6 +14,13 @@ import {
 	isSpellcheckablePart,
 	scanCompoundIdentifiers,
 } from './identifier';
+import {
+	DocumentRange,
+	getChangedRanges,
+	intersectsAnyRange,
+	mapDocumentRanges,
+} from './ranges';
+import type { CamelCaseSpellcheckSettings } from './settings';
 
 export interface SpellcheckContextTarget extends IdentifierPart {
 	suggestions: string[];
@@ -24,11 +31,6 @@ const EXCLUDED_SYNTAX_PATTERN =
 	/code|comment|frontmatter|html|url|autolink|linkmark/i;
 const CONTEXT_TARGET_LIFETIME_MS = 2_000;
 const SPELLCHECK_DEBOUNCE_MS = 600;
-
-interface DocumentRange {
-	from: number;
-	to: number;
-}
 
 const suppressNativeSpellcheck = Decoration.mark({
 	attributes: { spellcheck: 'false' },
@@ -45,8 +47,6 @@ export class CamelCaseSpellcheckController {
 	private readonly views = new Set<EditorView>();
 	private contextTarget: (SpellcheckContextTarget & { capturedAt: number }) | null =
 		null;
-	private dictionarySignature: string | null = null;
-	private dictionaryPollInProgress = false;
 
 	constructor(readonly spellchecker: DesktopSpellchecker) {
 		const views = this.views;
@@ -55,6 +55,11 @@ export class CamelCaseSpellcheckController {
 			class {
 				decorations: DecorationSet;
 				private debounceTimer: number | null = null;
+				/**
+				 * Ranges edited since the last debounce fired, kept in current
+				 * document coordinates. Identifiers touching them are not checked
+				 * until the user pauses, so half-typed words are not underlined.
+				 */
 				private deferredRanges: readonly DocumentRange[] = [];
 
 				constructor(private readonly view: EditorView) {
@@ -64,7 +69,10 @@ export class CamelCaseSpellcheckController {
 
 				update(update: ViewUpdate): void {
 					if (update.docChanged) {
-						this.deferredRanges = getChangedRanges(update);
+						this.deferredRanges = [
+							...mapDocumentRanges(this.deferredRanges, update.changes),
+							...getChangedRanges(update.changes),
+						];
 						this.scheduleSpellcheck();
 					}
 
@@ -111,11 +119,6 @@ export class CamelCaseSpellcheckController {
 						this.captureContextTarget(event, view);
 						return false;
 					},
-					focus: (_event, view) => {
-						spellchecker.clearCache();
-						view.dispatch({ effects: refreshSpellcheckEffect.of(null) });
-						return false;
-					},
 				},
 			},
 		);
@@ -132,6 +135,14 @@ export class CamelCaseSpellcheckController {
 		return this.contextTarget;
 	}
 
+	applySettings(settings: CamelCaseSpellcheckSettings): void {
+		this.spellchecker.setIgnoredWords(settings.ignoredWords);
+		this.spellchecker.setAcceptProgrammingAbbreviations(
+			settings.acceptProgrammingAbbreviations,
+		);
+		this.refreshAllViews();
+	}
+
 	addWordToDictionary(word: string): boolean {
 		const added = this.spellchecker.addWordToDictionary(word);
 		if (added) {
@@ -146,22 +157,8 @@ export class CamelCaseSpellcheckController {
 	}
 
 	async pollDictionaryChanges(): Promise<void> {
-		if (this.dictionaryPollInProgress) {
-			return;
-		}
-
-		this.dictionaryPollInProgress = true;
-		try {
-			const signature = await this.spellchecker.getDictionarySignature();
-			if (signature === this.dictionarySignature) {
-				return;
-			}
-
-			this.dictionarySignature = signature;
-			this.spellchecker.clearCache();
+		if (await this.spellchecker.syncNativeDictionary()) {
 			this.refreshAllViews();
-		} finally {
-			this.dictionaryPollInProgress = false;
 		}
 	}
 
@@ -172,7 +169,7 @@ export class CamelCaseSpellcheckController {
 
 	private captureContextTarget(event: MouseEvent, view: EditorView): void {
 		this.contextTarget = null;
-		if (!isEditorSpellcheckEnabled(view)) {
+		if (!isEditorSpellcheckEnabled(view) || !this.spellchecker.isReady) {
 			return;
 		}
 
@@ -217,7 +214,9 @@ function buildDecorations(
 	spellchecker: DesktopSpellchecker,
 	deferredRanges: readonly DocumentRange[] = [],
 ): DecorationSet {
-	if (!isEditorSpellcheckEnabled(view)) {
+	// Until the dictionary is loaded, leave native spellcheck fully in charge
+	// rather than suppressing it on identifiers that cannot be checked yet.
+	if (!isEditorSpellcheckEnabled(view) || !spellchecker.isReady) {
 		return Decoration.none;
 	}
 
@@ -226,15 +225,9 @@ function buildDecorations(
 	for (const visibleRange of view.visibleRanges) {
 		const scanFrom = view.state.doc.lineAt(visibleRange.from).from;
 		const scanTo = view.state.doc.lineAt(visibleRange.to).to;
-		const visibleText = view.state.doc.sliceString(
-			scanFrom,
-			scanTo,
-		);
+		const visibleText = view.state.doc.sliceString(scanFrom, scanTo);
 
-		for (const identifier of scanCompoundIdentifiers(
-			visibleText,
-			scanFrom,
-		)) {
+		for (const identifier of scanCompoundIdentifiers(visibleText, scanFrom)) {
 			if (
 				identifier.to <= visibleRange.from ||
 				identifier.from >= visibleRange.to ||
@@ -262,23 +255,6 @@ function buildDecorations(
 	}
 
 	return Decoration.set(ranges, true);
-}
-
-function getChangedRanges(update: ViewUpdate): DocumentRange[] {
-	const ranges: DocumentRange[] = [];
-	update.changes.iterChangedRanges((_fromA, _toA, fromB, toB) => {
-		ranges.push({ from: fromB, to: toB });
-	});
-	return ranges;
-}
-
-function intersectsAnyRange(
-	identifier: CompoundIdentifier,
-	ranges: readonly DocumentRange[],
-): boolean {
-	return ranges.some(
-		(range) => identifier.from <= range.to && identifier.to >= range.from,
-	);
 }
 
 function isEditorSpellcheckEnabled(view: EditorView): boolean {

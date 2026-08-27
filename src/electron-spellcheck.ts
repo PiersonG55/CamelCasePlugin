@@ -1,5 +1,6 @@
 import nspell from 'nspell';
 import englishDictionary from 'camel-case-spellcheck-english-dictionary';
+import { PROGRAMMING_ABBREVIATIONS, normalizeWord, normalizeWordList } from './word-lists';
 
 interface ElectronSession {
 	addWordToSpellCheckerDictionary(word: string): boolean;
@@ -20,17 +21,22 @@ interface ElectronRendererModule {
 	remote?: ElectronRemote;
 }
 
-interface CachedResult {
-	expiresAt: number;
-	isMisspelled: boolean;
-}
+type LocalSpellchecker = ReturnType<typeof nspell>;
 
-const CACHE_LIFETIME_MS = 60_000;
-
+/**
+ * Checks identifier parts against the bundled English dictionary plus three
+ * accepted-word sets: Obsidian's native custom dictionary (mirrored from
+ * Electron), the plugin's own ignore list, and the built-in programming
+ * abbreviations. The dictionary is parsed once and never rebuilt; all
+ * dictionary-like changes are plain set updates.
+ */
 export class DesktopSpellchecker {
-	private readonly cache = new Map<string, CachedResult>();
-	private localSpellchecker = createEnglishSpellchecker();
-	private customWordsSignature = '';
+	private readonly cache = new Map<string, boolean>();
+	private localSpellchecker: LocalSpellchecker | null = null;
+	private nativeCustomWords = new Set<string>();
+	private ignoredWords = new Set<string>();
+	private acceptProgrammingAbbreviations = true;
+	private nativeDictionarySignature = '';
 
 	private constructor(private readonly session: ElectronSession | null) {}
 
@@ -55,30 +61,59 @@ export class DesktopSpellchecker {
 		return this.session !== null;
 	}
 
+	/** False until {@link loadDictionary} has run; nothing is reported as misspelled before then. */
+	get isReady(): boolean {
+		return this.localSpellchecker !== null;
+	}
+
+	/**
+	 * Parses the bundled dictionary. This takes tens of milliseconds on the UI
+	 * thread, so callers defer it until Obsidian has finished starting up.
+	 */
+	loadDictionary(): void {
+		if (this.localSpellchecker === null) {
+			this.localSpellchecker = createEnglishSpellchecker();
+			this.clearCache();
+		}
+	}
+
+	setIgnoredWords(words: Iterable<string>): void {
+		this.ignoredWords = new Set(normalizeWordList(words));
+		this.clearCache();
+	}
+
+	setAcceptProgrammingAbbreviations(enabled: boolean): void {
+		if (this.acceptProgrammingAbbreviations !== enabled) {
+			this.acceptProgrammingAbbreviations = enabled;
+			this.clearCache();
+		}
+	}
+
 	isWordMisspelled(word: string): boolean {
-		const now = Date.now();
-		const cached = this.cache.get(word);
-		if (cached && cached.expiresAt > now) {
-			return cached.isMisspelled;
+		if (this.localSpellchecker === null) {
+			return false;
 		}
 
-		const isMisspelled = !this.localSpellchecker.correct(word);
-		this.cache.set(word, {
-			expiresAt: now + CACHE_LIFETIME_MS,
-			isMisspelled,
-		});
+		const cached = this.cache.get(word);
+		if (cached !== undefined) {
+			return cached;
+		}
+
+		const isMisspelled =
+			!this.isAcceptedWord(word) && !this.localSpellchecker.correct(word);
+		this.cache.set(word, isMisspelled);
 		return isMisspelled;
 	}
 
 	getSuggestions(word: string): string[] {
-		return this.localSpellchecker.suggest(word);
+		return this.localSpellchecker?.suggest(word) ?? [];
 	}
 
 	addWordToDictionary(word: string): boolean {
 		try {
 			const added = this.session?.addWordToSpellCheckerDictionary(word) ?? false;
 			if (added) {
-				this.localSpellchecker.add(word);
+				this.nativeCustomWords.add(normalizeWord(word));
 				this.clearCache();
 			}
 			return added;
@@ -91,33 +126,47 @@ export class DesktopSpellchecker {
 		this.cache.clear();
 	}
 
-	async getDictionarySignature(): Promise<string> {
+	/**
+	 * Mirrors Electron's spellcheck state and custom dictionary. Returns true when
+	 * anything changed since the previous call so callers can refresh decorations.
+	 */
+	async syncNativeDictionary(): Promise<boolean> {
 		let customWords: string[] = [];
+		let languages: string[] = ['en-US'];
+		let enabled = true;
 		try {
 			customWords =
 				(await this.session?.listWordsInSpellCheckerDictionary?.()) ?? [];
+			languages = this.session?.getSpellCheckerLanguages?.() ?? languages;
+			enabled = this.session?.isSpellCheckerEnabled?.() ?? enabled;
 		} catch {
-			// The local base dictionary remains usable if synchronization fails.
+			// The bundled dictionary remains usable if synchronization fails.
 		}
 
-		const sortedCustomWords = [...customWords].sort();
-		const customWordsSignature = JSON.stringify(sortedCustomWords);
-		if (customWordsSignature !== this.customWordsSignature) {
-			this.customWordsSignature = customWordsSignature;
-			this.localSpellchecker = createEnglishSpellchecker();
-			for (const word of sortedCustomWords) {
-				this.localSpellchecker.add(word);
-			}
-			this.clearCache();
+		const normalizedWords = normalizeWordList(customWords);
+		const signature = JSON.stringify([enabled, [...languages].sort(), normalizedWords]);
+		if (signature === this.nativeDictionarySignature) {
+			return false;
 		}
 
-		const languages = this.session?.getSpellCheckerLanguages?.() ?? ['en-US'];
-		const enabled = this.session?.isSpellCheckerEnabled?.() ?? true;
-		return JSON.stringify([enabled, [...languages].sort(), sortedCustomWords]);
+		this.nativeDictionarySignature = signature;
+		this.nativeCustomWords = new Set(normalizedWords);
+		this.clearCache();
+		return true;
+	}
+
+	private isAcceptedWord(word: string): boolean {
+		const normalized = normalizeWord(word);
+		return (
+			this.ignoredWords.has(normalized) ||
+			this.nativeCustomWords.has(normalized) ||
+			(this.acceptProgrammingAbbreviations &&
+				PROGRAMMING_ABBREVIATIONS.has(normalized))
+		);
 	}
 }
 
-function createEnglishSpellchecker(): ReturnType<typeof nspell> {
+function createEnglishSpellchecker(): LocalSpellchecker {
 	const decoder = new TextDecoder();
 	return nspell({
 		aff: decoder.decode(englishDictionary.aff),

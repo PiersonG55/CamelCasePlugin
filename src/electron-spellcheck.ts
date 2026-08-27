@@ -1,6 +1,11 @@
 import nspell from 'nspell';
 import englishDictionary from 'camel-case-spellcheck-english-dictionary';
-import { PROGRAMMING_ABBREVIATIONS, normalizeWord, normalizeWordList } from './word-lists';
+import {
+	HOST_AND_FILE_SUFFIXES,
+	PROGRAMMING_ABBREVIATIONS,
+	normalizeWord,
+	normalizeWordList,
+} from './word-lists';
 
 interface ElectronSession {
 	addWordToSpellCheckerDictionary(word: string): boolean;
@@ -161,7 +166,8 @@ export class DesktopSpellchecker {
 			this.ignoredWords.has(normalized) ||
 			this.nativeCustomWords.has(normalized) ||
 			(this.acceptProgrammingAbbreviations &&
-				PROGRAMMING_ABBREVIATIONS.has(normalized))
+				(PROGRAMMING_ABBREVIATIONS.has(normalized) ||
+					HOST_AND_FILE_SUFFIXES.has(normalized)))
 		);
 	}
 }

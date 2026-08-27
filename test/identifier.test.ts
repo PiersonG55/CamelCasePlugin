@@ -82,3 +82,57 @@ void test('recognizes a numeric-to-uppercase boundary', () => {
 		['version', '2', 'Value'],
 	);
 });
+
+void test('splits dotted identifiers on periods', () => {
+	assert.deepEqual(
+		scanCompoundIdentifiers('source.file.input')[0]?.parts.map((part) => part.text),
+		['source', 'file', 'input'],
+	);
+	assert.deepEqual(
+		scanCompoundIdentifiers('tp.file.title')[0]?.parts.map((part) => part.text),
+		['tp', 'file', 'title'],
+	);
+	assert.deepEqual(
+		scanCompoundIdentifiers('parseHTTPResponse.json')[0]?.parts.map(
+			(part) => part.text,
+		),
+		['parse', 'HTTP', 'Response', 'json'],
+	);
+});
+
+void test('keeps leading and trailing periods outside the identifier', () => {
+	const [identifier] = scanCompoundIdentifiers('see e.g. this and .gitignore', 0);
+	assert.ok(identifier);
+	assert.equal(identifier.text, 'e.g');
+	assert.equal(identifier.from, 4);
+	assert.equal(identifier.to, 7);
+	assert.equal(scanCompoundIdentifiers('.gitignore').length, 0);
+});
+
+void test('leaves hostnames and filenames to native spellcheck', () => {
+	assert.deepEqual(
+		scanCompoundIdentifiers(
+			'github.com docs.obsidian.md sdsde.kjasnfdjf.net wbebsite.pdf README.md archive.tar.gz',
+		),
+		[],
+	);
+});
+
+void test('checks dotted filenames that also have a case or underscore boundary', () => {
+	assert.equal(scanCompoundIdentifiers('myFile.txt').length, 1);
+	assert.equal(scanCompoundIdentifiers('my_file.txt').length, 1);
+});
+
+void test('skips purely numeric compounds', () => {
+	assert.deepEqual(scanCompoundIdentifiers('1.2.3 3.14 1_000_000'), []);
+	assert.equal(scanCompoundIdentifiers('v1.2.3').length, 1);
+});
+
+void test('can disable period splitting', () => {
+	const options = { splitOnPeriods: false };
+	assert.deepEqual(scanCompoundIdentifiers('source.file.input', 0, options), []);
+	assert.equal(
+		scanCompoundIdentifiers('source.fileInput', 0, options)[0]?.text,
+		'fileInput',
+	);
+});

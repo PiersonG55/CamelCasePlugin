@@ -8,12 +8,15 @@ import type CamelCaseSpellcheckPlugin from './main';
 import { normalizeWordList, parseWordListText } from './word-lists';
 
 export interface CamelCaseSpellcheckSettings {
+	/** Treat `source.file.input` as a compound identifier. */
+	splitOnPeriods: boolean;
 	acceptProgrammingAbbreviations: boolean;
 	/** Lowercase, sorted, unique. Never underlined inside identifiers. */
 	ignoredWords: string[];
 }
 
 export const DEFAULT_SETTINGS: CamelCaseSpellcheckSettings = {
+	splitOnPeriods: true,
 	acceptProgrammingAbbreviations: true,
 	ignoredWords: [],
 };
@@ -25,6 +28,10 @@ export function normalizeSettings(data: unknown): CamelCaseSpellcheckSettings {
 			? (data as Record<string, unknown>)
 			: {};
 	return {
+		splitOnPeriods:
+			typeof record.splitOnPeriods === 'boolean'
+				? record.splitOnPeriods
+				: DEFAULT_SETTINGS.splitOnPeriods,
 		acceptProgrammingAbbreviations:
 			typeof record.acceptProgrammingAbbreviations === 'boolean'
 				? record.acceptProgrammingAbbreviations
@@ -54,8 +61,17 @@ export class CamelCaseSpellcheckSettingTab extends PluginSettingTab {
 	getSettingDefinitions(): SettingDefinitionItem[] {
 		return [
 			{
+				name: 'Split identifiers on periods',
+				desc: 'Check dotted names such as source.file.input part by part. Hostnames and filenames such as example.com and notes.pdf are left to Obsidian’s native spellcheck.',
+				control: {
+					type: 'toggle',
+					key: 'splitOnPeriods',
+					defaultValue: DEFAULT_SETTINGS.splitOnPeriods,
+				},
+			},
+			{
 				name: 'Accept common programming abbreviations',
-				desc: 'Treat abbreviations such as src, init, num, and JSON as correctly spelled when they appear inside identifiers.',
+				desc: 'Treat abbreviations and file extensions such as src, init, num, JSON, and css as correctly spelled when they appear inside identifiers.',
 				control: {
 					type: 'toggle',
 					key: 'acceptProgrammingAbbreviations',
@@ -77,6 +93,8 @@ export class CamelCaseSpellcheckSettingTab extends PluginSettingTab {
 
 	getControlValue(key: string): unknown {
 		switch (key) {
+			case 'splitOnPeriods':
+				return this.plugin.settings.splitOnPeriods;
 			case 'acceptProgrammingAbbreviations':
 				return this.plugin.settings.acceptProgrammingAbbreviations;
 			case 'ignoredWords':
@@ -88,6 +106,10 @@ export class CamelCaseSpellcheckSettingTab extends PluginSettingTab {
 
 	async setControlValue(key: string, value: unknown): Promise<void> {
 		switch (key) {
+			case 'splitOnPeriods':
+				this.plugin.settings.splitOnPeriods = Boolean(value);
+				await this.plugin.saveSettings();
+				return;
 			case 'acceptProgrammingAbbreviations':
 				this.plugin.settings.acceptProgrammingAbbreviations = Boolean(value);
 				await this.plugin.saveSettings();

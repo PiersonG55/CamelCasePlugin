@@ -10,7 +10,9 @@ import {
 import { DesktopSpellchecker } from './electron-spellcheck';
 import {
 	CompoundIdentifier,
+	DEFAULT_SCAN_OPTIONS,
 	IdentifierPart,
+	ScanOptions,
 	isSpellcheckablePart,
 	scanCompoundIdentifiers,
 } from './identifier';
@@ -47,9 +49,11 @@ export class CamelCaseSpellcheckController {
 	private readonly views = new Set<EditorView>();
 	private contextTarget: (SpellcheckContextTarget & { capturedAt: number }) | null =
 		null;
+	private scanOptions: ScanOptions = { ...DEFAULT_SCAN_OPTIONS };
 
 	constructor(readonly spellchecker: DesktopSpellchecker) {
 		const views = this.views;
+		const getScanOptions = (): ScanOptions => this.scanOptions;
 
 		this.extension = ViewPlugin.fromClass(
 			class {
@@ -64,7 +68,7 @@ export class CamelCaseSpellcheckController {
 
 				constructor(private readonly view: EditorView) {
 					views.add(view);
-					this.decorations = buildDecorations(view, spellchecker);
+					this.decorations = buildDecorations(view, spellchecker, getScanOptions());
 				}
 
 				update(update: ViewUpdate): void {
@@ -86,6 +90,7 @@ export class CamelCaseSpellcheckController {
 						this.decorations = buildDecorations(
 							update.view,
 							spellchecker,
+							getScanOptions(),
 							this.deferredRanges,
 						);
 					}
@@ -136,6 +141,7 @@ export class CamelCaseSpellcheckController {
 	}
 
 	applySettings(settings: CamelCaseSpellcheckSettings): void {
+		this.scanOptions = { splitOnPeriods: settings.splitOnPeriods };
 		this.spellchecker.setIgnoredWords(settings.ignoredWords);
 		this.spellchecker.setAcceptProgrammingAbbreviations(
 			settings.acceptProgrammingAbbreviations,
@@ -179,7 +185,11 @@ export class CamelCaseSpellcheckController {
 		}
 
 		const line = view.state.doc.lineAt(position);
-		const identifier = scanCompoundIdentifiers(line.text, line.from).find(
+		const identifier = scanCompoundIdentifiers(
+			line.text,
+			line.from,
+			this.scanOptions,
+		).find(
 			(candidate) => position >= candidate.from && position <= candidate.to,
 		);
 		if (!identifier || isExcludedSyntax(view, identifier.from)) {
@@ -212,6 +222,7 @@ export class CamelCaseSpellcheckController {
 function buildDecorations(
 	view: EditorView,
 	spellchecker: DesktopSpellchecker,
+	scanOptions: ScanOptions,
 	deferredRanges: readonly DocumentRange[] = [],
 ): DecorationSet {
 	// Until the dictionary is loaded, leave native spellcheck fully in charge
@@ -227,7 +238,11 @@ function buildDecorations(
 		const scanTo = view.state.doc.lineAt(visibleRange.to).to;
 		const visibleText = view.state.doc.sliceString(scanFrom, scanTo);
 
-		for (const identifier of scanCompoundIdentifiers(visibleText, scanFrom)) {
+		for (const identifier of scanCompoundIdentifiers(
+			visibleText,
+			scanFrom,
+			scanOptions,
+		)) {
 			if (
 				identifier.to <= visibleRange.from ||
 				identifier.from >= visibleRange.to ||

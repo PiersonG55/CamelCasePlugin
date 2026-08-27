@@ -65,3 +65,39 @@ export function normalizeWordList(words: Iterable<unknown> | null | undefined): 
 export function parseWordListText(text: string): string[] {
 	return normalizeWordList(text.split(/[\s,]+/u));
 }
+
+/**
+ * Final segments that mark a dotted token as a hostname or filename rather
+ * than a code identifier: `example.com`, `notes.pdf`. Native spellcheck already
+ * skips such tokens, so the plugin leaves them alone to avoid introducing new
+ * underlines in prose. The list errs on the large side: a missing entry makes
+ * the plugin claim a token native ignores, while an extra entry changes
+ * nothing. Keep every entry lowercase.
+ */
+export const HOST_AND_FILE_SUFFIXES: ReadonlySet<string> = new Set([
+	// Top-level domains
+	'ai', 'app', 'at', 'au', 'be', 'biz', 'br', 'ca', 'ch', 'cn', 'co', 'com',
+	'de', 'dev', 'edu', 'es', 'eu', 'fm', 'fr', 'gg', 'gov', 'in', 'info', 'io',
+	'it', 'jp', 'kr', 'ly', 'me', 'mil', 'net', 'nl', 'nz', 'org', 'ru', 'se',
+	'sh', 'so', 'to', 'tv', 'uk', 'us', 'xyz', 'za',
+	// Documents and data
+	'md', 'markdown', 'txt', 'rtf', 'pdf', 'doc', 'docx', 'odt', 'xls', 'xlsx',
+	'ods', 'ppt', 'pptx', 'odp', 'key', 'pages', 'numbers', 'epub', 'mobi',
+	'csv', 'tsv', 'json', 'jsonl', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf',
+	'xml', 'plist', 'log', 'lock', 'env', 'tex', 'bib', 'canvas',
+	// Code
+	'js', 'mjs', 'cjs', 'ts', 'mts', 'cts', 'tsx', 'jsx', 'css', 'scss', 'sass',
+	'less', 'html', 'htm', 'vue', 'svelte', 'py', 'pyc', 'rb', 'php', 'java',
+	'kt', 'kts', 'swift', 'go', 'rs', 'c', 'h', 'cc', 'cpp', 'hpp', 'cs', 'fs',
+	'sql', 'sqlite', 'db', 'bat', 'cmd', 'ps1', 'psm1', 'bash', 'zsh', 'lua',
+	'r', 'pl', 'ex', 'exs', 'erl', 'hs', 'scala', 'clj', 'dart', 'm', 'mm',
+	'gradle', 'map', 'wasm',
+	// Images, audio, video, fonts
+	'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'tif', 'tiff', 'heic',
+	'svg', 'psd', 'mp3', 'mp4', 'm4a', 'mov', 'avi', 'mkv', 'wav', 'flac',
+	'ogg', 'webm', 'wmv', 'ttf', 'otf', 'woff', 'woff2', 'eot',
+	// Archives and binaries
+	'zip', 'gz', 'tgz', 'tar', 'rar', '7z', 'bz2', 'xz', 'exe', 'dll',
+	'dylib', 'bin', 'dmg', 'pkg', 'msi', 'deb', 'rpm', 'apk', 'ipa', 'iso',
+	'img', 'bak', 'tmp', 'swp', 'old', 'orig',
+]);

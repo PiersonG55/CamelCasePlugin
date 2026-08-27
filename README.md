@@ -1,11 +1,12 @@
 # Camel Case Spellcheck
 
 Camel Case Spellcheck is a desktop-only Obsidian plugin that checks the words
-inside `camelCase`, `PascalCase`, and `snake_case` identifiers independently.
+inside `camelCase`, `PascalCase`, `snake_case`, and `dotted.name` identifiers
+independently.
 
 Obsidian normally treats a complete identifier as one spelling token. This
-plugin splits compound identifiers at case and underscore boundaries and
-underlines only the component that appears to be misspelled.
+plugin splits compound identifiers at case, underscore, and period boundaries
+and underlines only the component that appears to be misspelled.
 
 | Text | Result |
 | --- | --- |
@@ -14,12 +15,17 @@ underlines only the component that appears to be misspelled.
 | `theLastWordIsMispleled` | Only `Mispleled` is underlined |
 | `the_last_word_is_mispleled` | Only `mispleled` is underlined |
 | `parseHTTPResponse` | Checked as `parse`, `HTTP`, and `Response` |
+| `source.file.input` | Checked as `source`, `file`, and `input` |
+| `example.com`, `notes.pdf` | Left to Obsidian's native spellchecker |
 | `Mispleled` | Left to Obsidian's native spellchecker |
 
 ## Features
 
-- Checks components of camel case, Pascal case, snake case, acronyms, mixed
-  styles, and identifiers with numeric boundaries.
+- Checks components of camel case, Pascal case, snake case, dotted names such
+  as `source.file.input`, acronyms, mixed styles, and identifiers with numeric
+  boundaries. Hostnames and filenames such as `example.com` and `notes.pdf`
+  are left to native spellcheck, which already skips them. Period splitting
+  can be turned off in settings.
 - Uses a bundled US English Hunspell-compatible dictionary, so checking is
   local and works offline.
 - Waits briefly after an edit before displaying a new underline, matching the
